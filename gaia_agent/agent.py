@@ -55,28 +55,13 @@ class Agent:
 
     def call_tool_and_append_result(self, llm_response: Choice, messages: list) -> list:
         """Call the requested tool and return the result as a string."""
+        messages.append(llm_response.message)
         for tool_call in llm_response.message.tool_calls:
             # args are returned as a string, so we need to parse them to a dict
             arguments = (
                 json.loads(tool_call.function.arguments)
                 if isinstance(tool_call.function.arguments, str)
                 else tool_call.function.arguments
-            )
-            # append function calling message
-            messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": tool_call.id,
-                            "type": "function",
-                            "function": {
-                                "name": tool_call.function.name,
-                                "arguments": json.dumps(arguments),
-                            },
-                        },
-                    ],
-                },
             )
             # call the tool and append the result
             tool_result = self.tools[tool_call.function.name][0](**arguments)
@@ -85,22 +70,23 @@ class Agent:
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "name": tool_call.function.name,
-                    "content": json.dumps(tool_result),
+                    "content": str(json.dumps(tool_result)),
                 },
             )
         return messages
 
-    def llm_call(self, messages: list, use_reasoning: bool = True) -> Choice:
+    def llm_call(self, messages: list, use_reasoning: bool = False) -> Choice:
         """Call the LLM with the given messages and return the response."""
         gpt_request_params = {
             "model": self.reasoning_model_name if use_reasoning else self.model_name,
             "messages": messages,
-            "functions": self.tools,
+            "tools": [{"type": "function", "function": tool} for tool in self.tool_definitions],
         }
         if use_reasoning:
             gpt_request_params["reasoning_effort"] = self.reasoning_effort
 
-        return self.llm.chat.completions.create(**gpt_request_params).choices[0]
+        res = self.llm.chat.completions.create(**gpt_request_params)
+        return res.choices[0]
 
     def format_response(self, response: str) -> str:
         """Format the response from the LLM."""

@@ -59,7 +59,7 @@ def read_content_from_webpage(url: str) -> str:
 
 def analyze_excel_file(file_path: str) -> str:
     """Analyze the Excel file and return a summary."""
-    df = pd.read_excel(file_path)
+    df = pd.read_excel(file_path, engine="openpyxl")
     result = f"Excel file loaded with {len(df)} rows and {len(df.columns)} columns.\n"
     result += f"Columns: {', '.join(df.columns)}\n\n"
 

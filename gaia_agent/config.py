@@ -10,7 +10,7 @@ class Config(BaseSettings, cli_enforce_required=True):
 
     AZURE_OPENAI_API_KEY: str = Field()
     AZURE_OPENAI_API_ENDPOINT: str = Field()
-    AZURE_OPENAI_API_VERSION: str = "2025-01-01-preview"
+    AZURE_OPENAI_API_VERSION: str = "2025-03-01-preview"
 
     AGENT_MODEL_NAME: str = "gpt-4.1-mini"
     AGENT_REASONING_MODEL_NAME: str = "o4-mini"
