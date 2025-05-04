@@ -1,0 +1,50 @@
+line-length = 120
+
+[lint]
+select = [
+    "E",
+    "W", # PyCodeStyle
+    "F", # PyFlakes
+    "C90", # McCabe (Function Complexity
+    "I", # ISort
+    "N", # PEP8 Naming Conventions
+    "D", # PyDocStyle
+    "UP", # pyupgrade
+    "YTT", # flake8-2020 ('Yield from' etc.)
+    "ANN", # flake8-annotations (missing type annotations)
+    "ASYNC", # flake8-async (various async issues)
+    "S", # flake8-bandit (security issues)
+    "BLE", # blind exceptions
+    "B", # bugbear (various anti-patterns)
+    "A", # flake8-builtins (shadowing builtins)
+    "COM", # flake8-commas (comma placement at line-end)
+    "C4", # flake8-comprehensions (comprehension issues like unnecessary list comprehensions etc.)
+    "EM", # ensure error messages are not formatted as f-strings and similar
+    "FA", # flake8-future-annotations (ensure type hint annotation use mnodern syntax)
+    "ISC", # implicit string concatenation
+    "G", # flake8-logging-format (ensure logging format strings are valid)
+    "PIE", # various anti-patterns and misfeatures
+    "Q", # quotes (ensure consistent usage of single/double quotes)
+    "RSE", # some "raise" syntax issues
+    "RET", # return values anti-patterns
+    "SLF", # flake8-self (do not access "_private" attributes from outside)
+    "SLOT", # flake8-slots (ensure usage of __slots__)
+    "SIM", # flake8-simplify (simplify various constructs)
+    "PL", # PyLint (various issues)
+    "TRY", # try/except/else/finally anti-patterns (try.ceratops)
+    "FLY", # join vs. f-strings
+    "PERF", # various performance issues
+    "RUF", # ruff (various issues)
+]
+
+ignore = [
+    "ANN204", # do not require "__init__" return type annotations
+    "COM812", # allow comma placement at end of line
+    "ISC001", # allow implicit string concatenation
+    "D100", # do not require docstrings for public modules
+    "D104", # do not require docstrings for public methods
+    "D107", # do not require docstrings for public classes and modules
+    "ANN002", # no type annotation for *args
+    "ANN003", # no type annotation for **kwargs
+    "FA102", # do not require "from __future__ import annotations"
+]
