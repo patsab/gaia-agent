@@ -10,7 +10,9 @@ from .llm import get_llm
 from .tools import get_tool_list
 
 SYSTEM_PROMPT = """You are an AI assistant, who is responsable for answering the user question.
-You can use the available tools to answer the question."""
+You can use the available tools to answer the question.
+If a file_url is provided, the file needs to be downloaded first and the the tools can access the file. (except tools which accept URLs as input).
+If you need to access a website, but the URL is not directly priovided, use the web_search tool first to find the URL."""
 
 
 class Agent:
@@ -51,7 +53,7 @@ class Agent:
                 return f"Error: Unknown stop reason: {response.finish_reason}"
 
         # final formatting
-        return self.format_response(messages[-1]["content"])
+        return self.format_response(f"Question:{question} \n\n\n Agent Answer:{messages[-1]["content"]}")
 
     def call_tool_and_append_result(self, llm_response: Choice, messages: list) -> list:
         """Call the requested tool and return the result as a string."""
@@ -75,7 +77,7 @@ class Agent:
             )
         return messages
 
-    def llm_call(self, messages: list, use_reasoning: bool = False) -> Choice:
+    def llm_call(self, messages: list, use_reasoning: bool = True) -> Choice:
         """Call the LLM with the given messages and return the response."""
         gpt_request_params = {
             "model": self.reasoning_model_name if use_reasoning else self.model_name,
@@ -93,7 +95,8 @@ class Agent:
         format_prompt = (
             "You are an AI assistant, who is responsable for formatting the response of the LLM. "
             "You get the answer from another Agent and you just need to format it. "
-            "The Answer should be a number OR as few words as possible OR a comma separated list of numbers and/or strings. "  # noqa: E501
+            "Sometimes the question already has a formatting instruction, so you need to follow it. "
+            "The Answer should be a number OR as few words as possible OR a comma separated list of numbers and/or strings."  # noqa: E501
             "If you are asked for a number, don't use comma to write your number neither use units such as $ or percent sign unless specified otherwise. "  # noqa: E501
             "If you are asked for a string, don't use articles, neither abbreviations (e.g. for cities), and write the digits in plain text unless specified otherwise."  # noqa: E501
             "If you are asked for a comma separated list, apply the above rules depending of whether the element to be put in the list is a number or a string."  # noqa: E501

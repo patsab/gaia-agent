@@ -83,41 +83,46 @@ def analyze_csv_file(file_path: str) -> str:
     return result
 
 
-def analyze_image(base64_image: str) -> str:
-    """Analyze the image and return a description."""
+def analyze_image_from_url(image_url: str) -> str:
+    """Analyze an image provided through an URL and return a detailed textual description of its content."""
     # Placeholder for image analysis logic
     prompt = (
-        "Analyze the image and provide a detailed description of its content.\n"
-        "The important pieces of information to extract from the image are:\n"
-        "1. Visual elements and objects\n"
-        "2. Colors, Patterns, Composition and Style\n"
-        "3. Text, Numbers and Symbols if present\n"
-        "4. Contextual information\n"
-        "5. Overall context and meaning\n"
-        "6. Any other relevant details\n"
+            "Analyze the image and provide a detailed description of its content.\n"
+            "The important pieces of information to extract from the image are:\n"
+            "1. Visual elements and objects\n"
+            "2. Colors, Patterns, Composition and Style\n"
+            "3. Text, Numbers and Symbols if present\n"
+            "4. Contextual information\n"
+            "5. Overall context and meaning\n"
+            "6. Any other relevant details\n"
     )
     llm = get_llm()
 
     messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
-            ],
-        }
-    ]
+            {
+                    "role": "user",
+                    "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                            ],
+                    }
+            ]
 
     completion = llm.chat.completions.create(model=CONFIG.AGENT_MODEL_NAME, messages=messages)
     return completion.choices[0].message.content
+
+
+def analyze_image_from_base64(base64_image: str) -> str:
+    """Analyze the image and return a description."""
+    return analyze_image_from_url(f"data:image/jpeg;base64,{base64_image}")
 
 
 def search_web(search_term: str, num_results: int = 5) -> list[dict[str, str]]:
     """Websearch using DuckDuckGo."""
     encoded_search_term = quote_plus(search_term)
     headers = {
-        # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # noqa: E501
-    }
+            # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # noqa: E501
+            }
 
     search_url = f"https://html.duckduckgo.com/html/?q={encoded_search_term}"
 
@@ -151,7 +156,7 @@ def search_web(search_term: str, num_results: int = 5) -> list[dict[str, str]]:
 def check_available_wikipedia_articles(possible_title: str) -> list[str]:
     """Check if a Wikipedia article with the given title exists."""
     try:
-        search_url = f"https://de.wikipedia.org/w/index.php?search={possible_title.replace(' ', '_')}"
+        search_url = f"https://en.wikipedia.org/w/index.php?search={possible_title.replace(' ', '_')}"
         response = requests.get(search_url, timeout=60)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
@@ -183,9 +188,9 @@ def check_available_wikipedia_articles(possible_title: str) -> list[str]:
             link = exact_match.find("a")
             if link and link.get("title") and link.get("title") not in search_results:
                 search_results.insert(
-                    0,
-                    link.get("title"),
-                )
+                        0,
+                        link.get("title"),
+                        )
 
         return search_results  # noqa: TRY300
 
@@ -197,12 +202,11 @@ def check_available_wikipedia_articles(possible_title: str) -> list[str]:
 def get_wikipedia_article(title: str) -> str:
     """Return the content of a Wikipedia article."""
     try:
-        url = f"https://de.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
         response = requests.get(url, timeout=60)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
-        content = soup.find("div", class_="mw-parser-output").get_text()
-        return content[:2000]
+        return soup.find("div", class_="mw-parser-output").get_text()
     except requests.RequestException as e:
         print(f"Fehler beim Abrufen des Wikipedia-Artikels: {e}")
         return ""
@@ -242,7 +246,7 @@ def download_youtube_transcript(video_url: str) -> str:
         transcript_data = transcript.fetch()
 
         # Format transcript
-        full_transcript = " ".join([item["text"] for item in transcript_data])
+        full_transcript = " ".join([item.text for item in transcript_data])
         return full_transcript[:4000]  # Limit length if necessary
 
     except (NoTranscriptFound, TranscriptsDisabled):
@@ -251,130 +255,168 @@ def download_youtube_transcript(video_url: str) -> str:
         return f"An unexpected error occurred: {e!s}"
 
 
+def transcribe_mp3_file(file_path: str) -> str:
+    """Transcribe an MP3 file using the Whisper Speech To Text Model."""
+
+    transcription = get_llm().audio.transcriptions.create(
+            file=open(file_path, "rb"),
+            model="whisper"
+            )
+    return transcription.text
+
+
 def get_tool_list() -> dict[str, tuple[Callable, FunctionDefinition]]:
     """Return a dictionary of available tools, keyed by their string name."""
     # Define the original mapping of callable -> FunctionDefinition
     tools_mapping = {
-        download_file_from_url: FunctionDefinition(
-            name="download_file_from_url",
-            description="Download a file from a URL and save it to a temporary location. Returns the path to the downloaded file or an error message.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string", "description": "The URL of the file to download."},
-                    "filename": {
-                        "type": "string",
-                        "description": "Optional filename to save the file as. If not provided, it will be inferred from the URL or generated randomly.",  # noqa: E501
-                    },
-                },
-                "required": ["url"],
-            },
-        ),
-        read_content_from_webpage: FunctionDefinition(
-            name="read_content_from_webpage",
-            description="Read the textual content from a webpage URL and return the first 2000 characters.",
-            parameters={
-                "type": "object",
-                "properties": {"url": {"type": "string", "description": "The URL of the webpage to read."}},
-                "required": ["url"],
-            },
-        ),
-        analyze_excel_file: FunctionDefinition(
-            name="analyze_excel_file",
-            description="Analyze an Excel file (.xlsx) located at the given file path. Returns a summary including row/column count, column names, and basic descriptive statistics.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The local file path to the Excel file to analyze. This file should typically be downloaded first using 'download_file_from_url'.",  # noqa: E501
-                    }
-                },
-                "required": ["file_path"],
-            },
-        ),
-        analyze_csv_file: FunctionDefinition(
-            name="analyze_csv_file",
-            description="Analyze a CSV file located at the given file path. Returns a summary including row/column count, column names, and basic descriptive statistics.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "The local file path to the CSV file to analyze. This file should typically be downloaded first using 'download_file_from_url'.",  # noqa: E501
-                    }
-                },
-                "required": ["file_path"],
-            },
-        ),
-        analyze_image: FunctionDefinition(
-            name="analyze_image",
-            description="Analyze an image provided as a base64 encoded string and return a detailed textual description of its content.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "base64_image": {
-                        "type": "string",
-                        "description": "The base64 encoded string representation of the image to analyze.",
-                    }
-                },
-                "required": ["base64_image"],
-            },
-        ),
-        search_web: FunctionDefinition(
-            name="search_web",
-            description="Perform a web search using DuckDuckGo with the given search term and return a list of search results, each containing a title, link, and snippet.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "search_term": {"type": "string", "description": "The term or query to search for on the web."},
-                    "num_results": {
-                        "type": "integer",
-                        "description": "The maximum number of search results to return. Defaults to 5.",
-                        "default": 5,
-                    },
-                },
-                "required": ["search_term"],
-            },
-        ),
-        check_available_wikipedia_articles: FunctionDefinition(
-            name="check_available_wikipedia_articles",
-            description="Check German Wikipedia for articles matching the given search term. Returns a list of potential exact article titles.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "possible_title": {
-                        "type": "string",
-                        "description": "The search term or potential title to look up on German Wikipedia.",
-                    }
-                },
-                "required": ["possible_title"],
-            },
-        ),
-        get_wikipedia_article: FunctionDefinition(
-            name="get_wikipedia_article",
-            description="Retrieve the content of a specific German Wikipedia article using its exact title. Returns the first 2000 characters of the article's main content.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "The exact title of the German Wikipedia article to retrieve. Use 'check_available_wikipedia_articles' first to find potential titles.",  # noqa: E501
-                    }
-                },
-                "required": ["title"],
-            },
-        ),
-        download_youtube_transcript: FunctionDefinition(
-            name="download_youtube_transcript",
-            description="Download the available transcript (preferring German or English) for a given YouTube video URL. Returns the first 4000 characters of the transcript text or an error message.",  # noqa: E501
-            parameters={
-                "type": "object",
-                "properties": {"video_url": {"type": "string", "description": "The URL of the YouTube video."}},
-                "required": ["video_url"],
-            },
-        ),
-    }
+            transcribe_mp3_file: FunctionDefinition(
+                    name="transcribe_mp3_file",
+                    description="Transcribe an MP3 file using the Whisper Speech To Text Model.",
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "file_path": {
+                                            "type": "string",
+                                            "description": "The local file path to the MP3 file to transcribe.",
+                                            }
+                                    },
+                            "required": ["file_path"],
+                            },
+                    ),
+            download_file_from_url: FunctionDefinition(
+                    name="download_file_from_url",
+                    description="Download a file from a URL and save it to a temporary location. Returns the path to the downloaded file or an error message.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "url": {"type": "string", "description": "The URL of the file to download."},
+                                    "filename": {
+                                            "type": "string",
+                                            "description": "Optional filename to save the file as. If not provided, it will be inferred from the URL or generated randomly.",  # noqa: E501
+                                            },
+                                    },
+                            "required": ["url"],
+                            },
+                    ),
+            read_content_from_webpage: FunctionDefinition(
+                    name="read_content_from_webpage",
+                    description="Read the textual content from a webpage URL and return the first 2000 characters.",
+                    parameters={
+                            "type": "object",
+                            "properties": {"url": {"type": "string", "description": "The URL of the webpage to read."}},
+                            "required": ["url"],
+                            },
+                    ),
+            analyze_excel_file: FunctionDefinition(
+                    name="analyze_excel_file",
+                    description="Analyze an Excel file (.xlsx) located at the given file path. Returns a summary including row/column count, column names, and basic descriptive statistics.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "file_path": {
+                                            "type": "string",
+                                            "description": "The local file path to the Excel file to analyze. This file should typically be downloaded first using 'download_file_from_url'.",  # noqa: E501
+                                            }
+                                    },
+                            "required": ["file_path"],
+                            },
+                    ),
+            analyze_csv_file: FunctionDefinition(
+                    name="analyze_csv_file",
+                    description="Analyze a CSV file located at the given file path. Returns a summary including row/column count, column names, and basic descriptive statistics.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "file_path": {
+                                            "type": "string",
+                                            "description": "The local file path to the CSV file to analyze. This file should typically be downloaded first using 'download_file_from_url'.",  # noqa: E501
+                                            }
+                                    },
+                            "required": ["file_path"],
+                            },
+                    ),
+            analyze_image_from_url: FunctionDefinition(
+                    name="analyze_image_from_url",
+                    description="Analyze an image provided through an URL and return a detailed textual description of its content.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "image_url": {
+                                            "type": "string",
+                                            "description": "URL of the image, which should be analyzed.",
+                                            }
+                                    },
+                            "required": ["image_url"],
+                            },
+                    ),
+            analyze_image_from_base64: FunctionDefinition(
+                    name="analyze_image_from_base64",
+                    description="Analyze an image provided as a base64 encoded string and return a detailed textual description of its content.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "base64_image": {
+                                            "type": "string",
+                                            "description": "The base64 encoded string representation of the image to analyze.",
+                                            }
+                                    },
+                            "required": ["base64_image"],
+                            },
+                    ),
+            search_web: FunctionDefinition(
+                    name="search_web",
+                    description="Perform a web search using DuckDuckGo with the given search term and return a list of search results, each containing a title, link, and snippet.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "search_term": {"type": "string", "description": "The term or query to search for on the web."},
+                                    "num_results": {
+                                            "type": "integer",
+                                            "description": "The maximum number of search results to return. Defaults to 5.",
+                                            "default": 5,
+                                            },
+                                    },
+                            "required": ["search_term"],
+                            },
+                    ),
+            check_available_wikipedia_articles: FunctionDefinition(
+                    name="check_available_wikipedia_articles",
+                    description="Check German Wikipedia for articles matching the given search term. Returns a list of potential exact article titles.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "possible_title": {
+                                            "type": "string",
+                                            "description": "The search term or potential title to look up on German Wikipedia.",
+                                            }
+                                    },
+                            "required": ["possible_title"],
+                            },
+                    ),
+            get_wikipedia_article: FunctionDefinition(
+                    name="get_wikipedia_article",
+                    description="Retrieve the content of a specific German Wikipedia article using its exact title. Returns the first 2000 characters of the article's main content.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {
+                                    "title": {
+                                            "type": "string",
+                                            "description": "The exact title of the German Wikipedia article to retrieve. Use 'check_available_wikipedia_articles' first to find potential titles.",  # noqa: E501
+                                            }
+                                    },
+                            "required": ["title"],
+                            },
+                    ),
+            download_youtube_transcript: FunctionDefinition(
+                    name="download_youtube_transcript",
+                    description="Download the available transcript (preferring German or English) for a given YouTube video URL. Returns the first 4000 characters of the transcript text or an error message.",  # noqa: E501
+                    parameters={
+                            "type": "object",
+                            "properties": {"video_url": {"type": "string", "description": "The URL of the YouTube video."}},
+                            "required": ["video_url"],
+                            },
+                    ),
+            }
 
     # Transform the dictionary using a dictionary comprehension
     return {
